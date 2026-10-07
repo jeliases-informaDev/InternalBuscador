@@ -1,4 +1,5 @@
-﻿using internal_search_backend.Security;
+﻿using internal_search.Domain.DTOs.buscador.persona.individual;
+using internal_search_backend.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -55,18 +56,15 @@ namespace internal_search_backend.Controllers.Buscador.persona.masivo
 
         [HttpPost("masivo/historial")]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> RecibirHistorial(
-            [FromForm] IFormFile archivoExcel,
-            [FromForm] string[] secciones,
-            [FromForm] int totalDnis)
+        public async Task<IActionResult> RecibirHistorial([FromForm] RecibirHistorialEntrada request)
         {
-            if (archivoExcel == null || archivoExcel.Length == 0)
+            if (request.ArchivoExcel == null || request.ArchivoExcel.Length == 0)
                 return BadRequest("Debes enviar el archivo Excel.");
 
-            if (secciones == null || secciones.Length == 0)
+            if (request.Secciones == null || request.Secciones.Length == 0)
                 return BadRequest("Debes enviar las secciones seleccionadas.");
 
-            if (totalDnis <= 0)
+            if (request.TotalDnis <= 0)
                 return BadRequest("El total de DNI debe ser mayor a cero.");
 
             var usuarioId =
@@ -78,12 +76,12 @@ namespace internal_search_backend.Controllers.Buscador.persona.masivo
                 return Unauthorized("El token no contiene un código de usuario válido.");
 
             using var ms = new MemoryStream();
-            await archivoExcel.CopyToAsync(ms);
+            await request.ArchivoExcel.CopyToAsync(ms);
 
-            var nombreArchivo = Path.GetFileName(archivoExcel.FileName);
+            var nombreArchivo = Path.GetFileName(request.ArchivoExcel.FileName);
 
             await _historialService.GuardarAsync(
-                codUsuario, ms.ToArray(), nombreArchivo, secciones, totalDnis);
+                codUsuario, ms.ToArray(), nombreArchivo, request.Secciones, request.TotalDnis);
 
             return Ok(new { mensaje = "Historial guardado correctamente." });
         }

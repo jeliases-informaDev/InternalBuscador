@@ -14,11 +14,10 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.personas
             _context = context;
         }
 
-        // ---------- RRCC: documento + periodo ----------
+        // ---------- RRCC: documento + periodo (Filtrado por Año Actual) ----------
 
         public async Task<List<Deuda>> BuscarDeudasAsync(
             string documento,
-            //string periodo,
             CancellationToken ct)
         {
             using var scope = new TransactionScope(
@@ -26,9 +25,12 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.personas
                 new TransactionOptions { IsolationLevel = IsolationLevel.ReadUncommitted },
                 TransactionScopeAsyncFlowOption.Enabled);
 
+            string anioActual = DateTime.Now.Year.ToString();
+
             var resultado = await _context.Deudas
                 .AsNoTracking()
-                .Where(x => x.Documento == documento )
+                .Where(x => x.Documento == documento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .OrderByDescending(x => x.Periodo)
                 .ToListAsync(ct);
 
             scope.Complete();
@@ -44,10 +46,12 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.personas
                 new TransactionOptions { IsolationLevel = IsolationLevel.ReadUncommitted },
                 TransactionScopeAsyncFlowOption.Enabled);
 
+            string anioActual = DateTime.Now.Year.ToString();
+
             var resultado = await _context.LineaCreditos
                 .AsNoTracking()
-                .Where(x => x.Documento == documento)
-                .OrderBy(x => x.Documento)
+                .Where(x => x.Documento == documento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .OrderByDescending(x => x.Periodo)
                 .ToListAsync(ct);
 
             scope.Complete();
@@ -63,10 +67,12 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.personas
                 new TransactionOptions { IsolationLevel = IsolationLevel.ReadUncommitted },
                 TransactionScopeAsyncFlowOption.Enabled);
 
+            string anioActual = DateTime.Now.Year.ToString();
+
             var resultado = await _context.Calificaciones
                 .AsNoTracking()
-                .Where(x => x.Documento == documento)
-                .OrderBy(x => x.Documento)
+                .Where(x => x.Documento == documento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .OrderByDescending(x => x.Periodo)
                 .ToListAsync(ct);
 
             scope.Complete();
@@ -84,10 +90,12 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.personas
                 new TransactionOptions { IsolationLevel = IsolationLevel.ReadUncommitted },
                 TransactionScopeAsyncFlowOption.Enabled);
 
+            string anioActual = DateTime.Now.Year.ToString();
+
             var resultado = await _context.Sueldos
                 .AsNoTracking()
-                .Where(x => x.Documento == documento)
-                .OrderBy(x => x.Documento)
+                .Where(x => x.Documento == documento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .OrderByDescending(x => x.Periodo)
                 .ToListAsync(ct);
 
             scope.Complete();
@@ -103,10 +111,12 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.personas
                 new TransactionOptions { IsolationLevel = IsolationLevel.ReadUncommitted },
                 TransactionScopeAsyncFlowOption.Enabled);
 
+            string anioActual = DateTime.Now.Year.ToString();
+
             var resultado = await _context.Movil
                 .AsNoTracking()
-                .Where(x => x.Documento == documento)
-                .OrderBy(x => x.Documento)
+                .Where(x => x.Documento == documento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .OrderByDescending(x => x.Periodo)
                 .ToListAsync(ct);
 
             scope.Complete();
@@ -114,18 +124,20 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.personas
         }
 
         public async Task<List<Movil>> BuscarPorTelefonoAsync(
-        string telefono,
-        CancellationToken ct)
+            string telefono,
+            CancellationToken ct)
         {
             using var scope = new TransactionScope(
                 TransactionScopeOption.Required,
                 new TransactionOptions { IsolationLevel = IsolationLevel.ReadUncommitted },
                 TransactionScopeAsyncFlowOption.Enabled);
 
+            string anioActual = DateTime.Now.Year.ToString();
+
             var resultado = await _context.Movil
                 .AsNoTracking()
-                .Where(x => x.Telefono == telefono)
-                .OrderBy(x => x.Documento)
+                .Where(x => x.Telefono == telefono && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .OrderByDescending(x => x.Periodo)
                 .ToListAsync(ct);
 
             scope.Complete();

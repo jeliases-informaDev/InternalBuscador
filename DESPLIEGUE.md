@@ -197,7 +197,7 @@ actualización, la siguiente ejecución deja todo en orden.
 
 **Activarla (una sola vez)**, en un Símbolo del sistema como administrador **en el servidor**:
 ```bat
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr https://raw.githubusercontent.com/irubio06dev-svg/internal-search-backend/main/deploy/windows/actualizar.ps1 -OutFile $env:TEMP\actualizar.ps1 -UseBasicParsing; & $env:TEMP\actualizar.ps1 -Instalar"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr https://raw.githubusercontent.com/jeliases-informaDev/InternalBuscador/main/deploy/windows/actualizar.ps1 -OutFile $env:TEMP\actualizar.ps1 -UseBasicParsing; & $env:TEMP\actualizar.ps1 -Instalar"
 ```
 La primera vez instala el SDK y compila (varios minutos) y hace la primera actualización; al final dice
 «Actualización automática ACTIVA».
@@ -265,7 +265,7 @@ Solo cambian las direcciones; la API y el servidor siguen igual.
 Requisitos: Docker instalado y que la máquina alcance `192.168.1.17:1433`.
 
 ```bash
-git clone https://github.com/irubio06dev-svg/internal-search-backend.git
+git clone https://github.com/jeliases-informaDev/InternalBuscador.git
 cd internal-search-backend
 cp .env.example .env        # completar TODOS los valores (ver la tabla de abajo)
 docker compose up -d --build

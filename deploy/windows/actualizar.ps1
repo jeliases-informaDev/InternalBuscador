@@ -39,7 +39,7 @@ param(
     [switch]$Instalar,
     [switch]$Desinstalar,
     [string]$Raiz = 'C:\Buscador',
-    [string]$Repositorio = 'irubio06dev-svg/internal-search-backend',
+    [string]$Repositorio = 'jeliases-informaDev/InternalBuscador',
     [string]$Rama = 'main',
     [string]$Servicio = 'BuscadorApi',
     [string]$Dotnet,

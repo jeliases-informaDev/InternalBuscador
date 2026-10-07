@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Text;
+using System.Text.RegularExpressions;
 
 namespace internal_search.Domain.DTOs.buscador.persona.masivos
 {
@@ -13,26 +12,19 @@ namespace internal_search.Domain.DTOs.buscador.persona.masivos
         [Required(ErrorMessage = "El tipo de documento es obligatorio.")]
         public string TipoDocumento { get; set; }
 
-        //[Required(ErrorMessage = "El período es obligatorio.")]
-        //[RegularExpression(@"^\d{6}$", ErrorMessage = "El período debe tener formato YYYYMM (6 dígitos).")]
-        //public string Periodo { get; set; }
-
-        //[Required(ErrorMessage = "El teléfono es obligatorio.")]
-        //[RegularExpression(@"^9[0-9]{8}$",
-        //ErrorMessage = "El celular debe tener 9 dígitos y comenzar con 9.")]
-        //public string Telefono { get; set; } = string.Empty;
-
-        private static readonly Dictionary<string, int> LongitudesFijasPorTipo = new()
+        private static readonly Dictionary<string, (Regex Patron, string Formato)> Reglas = new()
         {
-            ["DNI"] = 8,
-            ["RUC"] = 11,
+            ["DNI"] = (new(@"^[0-9]{8}\z", RegexOptions.Compiled), "8 dígitos"),
+            ["CE"] = (new(@"^[0-9]{9}\z", RegexOptions.Compiled), "9 dígitos"),
+            ["RUC"] = (new(@"^[0-9]{11}\z", RegexOptions.Compiled), "11 dígitos"),
+            ["PASAPORTE"] = (new(@"^[A-Za-z0-9]{6,12}\z", RegexOptions.Compiled), "entre 6 y 12 caracteres alfanuméricos"),
         };
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            var tipo = TipoDocumento?.Trim().ToUpper();
+            var tipo = TipoDocumento?.Trim().ToUpperInvariant() ?? "";
 
-            if (!LongitudesFijasPorTipo.TryGetValue(tipo ?? "", out var longitudEsperada))
+            if (!Reglas.TryGetValue(tipo, out var regla))
             {
                 yield return new ValidationResult(
                     $"Tipo de documento '{TipoDocumento}' no soportado.",
@@ -40,17 +32,10 @@ namespace internal_search.Domain.DTOs.buscador.persona.masivos
                 yield break;
             }
 
-            if (Documento?.Length != longitudEsperada)
+            if (!regla.Patron.IsMatch(Documento ?? ""))
             {
                 yield return new ValidationResult(
-                    $"El {tipo} debe contener exactamente {longitudEsperada} dígitos.",
-                    new[] { nameof(Documento) });
-            }
-
-            if (!string.IsNullOrEmpty(Documento) && !Documento.All(char.IsDigit))
-            {
-                yield return new ValidationResult(
-                    $"El {tipo} debe contener solo números.",
+                    $"El {tipo} debe tener {regla.Formato}.",
                     new[] { nameof(Documento) });
             }
         }

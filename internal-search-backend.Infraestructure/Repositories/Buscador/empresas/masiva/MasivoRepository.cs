@@ -24,60 +24,42 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.empresas
             // 2. Instanciado el DTO masivo correcto
             var result = new BuscadorEmpresaMasivoResponseDto();
 
-            var pideMoviles = secciones.Contains(BuscadorEmpresaMasivoEntradaDtocs.Moviles);
-            var pideSueldos = secciones.Contains(BuscadorEmpresaMasivoEntradaDtocs.Sueldos);
-            var pideCalificacion = secciones.Contains(BuscadorEmpresaMasivoEntradaDtocs.Calificacion);
-            var pideDeuda = secciones.Contains(BuscadorEmpresaMasivoEntradaDtocs.Deuda);
-            var pideLineasCredito = secciones.Contains(BuscadorEmpresaMasivoEntradaDtocs.LineasCredito);
+            var pideMoviles = secciones.Contains(SeccionesMasivoEmpresa.Moviles);
+            var pideSueldos = secciones.Contains(SeccionesMasivoEmpresa.Sueldos);
+            var pideCalificacion = secciones.Contains(SeccionesMasivoEmpresa.Calificacion);
+            var pideDeuda = secciones.Contains(SeccionesMasivoEmpresa.Deuda);
+            var pideLineasCredito = secciones.Contains(SeccionesMasivoEmpresa.LineasCredito);
+
+            string anioActual = DateTime.Now.Year.ToString();
 
             foreach (var lote in rucsValidos.Chunk(1000))
             {
                 var batch = lote.ToList();
 
                 if (pideMoviles)
-                {
-                    var moviles = await _db.Movil
-                        .AsNoTracking()
-                        .Where(x => x.Documento != null && batch.Contains(x.Documento))
-                        .ToListAsync(ct);
-                    result.Moviles.AddRange(moviles);
-                }
+                    result.Moviles.AddRange(await _db.Movil.AsNoTracking()
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
 
                 if (pideSueldos)
-                {
-                    var sueldos = await _db.Sueldos
-                        .AsNoTracking()
-                        .Where(x => x.Documento != null && batch.Contains(x.Documento))
-                        .ToListAsync(ct);
-                    result.Sueldos.AddRange(sueldos);
-                }
+                    result.Sueldos.AddRange(await _db.Sueldos.AsNoTracking()
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
 
                 if (pideCalificacion)
-                {
-                    var calificaciones = await _db.Calificaciones
-                        .AsNoTracking()
-                        .Where(x => x.Documento != null && batch.Contains(x.Documento))
-                        .ToListAsync(ct);
-                    result.Calificaciones.AddRange(calificaciones);
-                }
+                    result.Calificaciones.AddRange(await _db.Calificaciones.AsNoTracking()
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
 
                 if (pideDeuda)
-                {
-                    var deudas = await _db.Deudas
-                        .AsNoTracking()
-                        .Where(x => x.Documento != null && batch.Contains(x.Documento))
-                        .ToListAsync(ct);
-                    result.Deudas.AddRange(deudas);
-                }
+                    result.Deudas.AddRange(await _db.Deudas.AsNoTracking()
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
 
                 if (pideLineasCredito)
-                {
-                    var lineas = await _db.LineaCreditos
-                        .AsNoTracking()
-                        .Where(x => x.Documento != null && batch.Contains(x.Documento))
-                        .ToListAsync(ct);
-                    result.LineasCredito.AddRange(lineas);
-                }
+                    result.LineasCredito.AddRange(await _db.LineaCreditos.AsNoTracking()
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
             }
 
             return result;

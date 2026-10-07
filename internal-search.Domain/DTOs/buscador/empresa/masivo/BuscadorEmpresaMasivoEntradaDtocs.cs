@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace internal_search.Domain.DTOs.buscador.empresa.masivo
 {
-    public static class BuscadorEmpresaMasivoEntradaDtocs
+    public static class SeccionesMasivoEmpresa
     {
         public const string Moviles = "moviles";
         public const string Sueldos = "sueldos";
@@ -12,7 +11,6 @@ namespace internal_search.Domain.DTOs.buscador.empresa.masivo
         public const string Deuda = "deuda";
         public const string LineasCredito = "lineascredito";
 
-        // Una lista con todas las secciones válidas para validar lo que envíe el cliente
         public static readonly HashSet<string> Todas = new(StringComparer.OrdinalIgnoreCase)
         {
             Moviles,

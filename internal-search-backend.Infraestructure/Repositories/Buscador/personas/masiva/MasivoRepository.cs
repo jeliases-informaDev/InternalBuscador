@@ -24,29 +24,36 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.personas
             var pideDeuda = secciones.Contains(SeccionesMasivo.Deuda);
             var pideLineasCredito = secciones.Contains(SeccionesMasivo.LineasCredito);
 
+            string anioActual = DateTime.Now.Year.ToString();
+
             foreach (var lote in validos.Chunk(1000))
             {
                 var batch = lote.ToList();
 
                 if (pideMoviles)
                     result.Moviles.AddRange(await _db.Movil.AsNoTracking()
-                        .Where(x => batch.Contains(x.Documento)).ToListAsync(ct));
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
 
                 if (pideSueldos)
                     result.Sueldos.AddRange(await _db.Sueldos.AsNoTracking()
-                        .Where(x => batch.Contains(x.Documento)).ToListAsync(ct));
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
 
                 if (pideCalificacion)
                     result.Calificaciones.AddRange(await _db.Calificaciones.AsNoTracking()
-                        .Where(x => batch.Contains(x.Documento)).ToListAsync(ct));
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
 
                 if (pideDeuda)
                     result.Deudas.AddRange(await _db.Deudas.AsNoTracking()
-                        .Where(x => batch.Contains(x.Documento)).ToListAsync(ct));
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
 
                 if (pideLineasCredito)
                     result.LineasCredito.AddRange(await _db.LineaCreditos.AsNoTracking()
-                        .Where(x => batch.Contains(x.Documento)).ToListAsync(ct));
+                        .Where(x => batch.Contains(x.Documento) && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                        .ToListAsync(ct));
             }
 
             return result;

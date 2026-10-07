@@ -17,9 +17,33 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.empresas
             _context = context;
         }
 
+        // Convierte "20606" -> "202606" para poder comparar bien
+        private static string NormalizarPeriodo(string p) =>
+            p.Length == 5 && p.StartsWith("20") ? "202" + p.Substring(2) : p;
+
+        // Devuelve los valores originales (con y sin error) del período más reciente
+        private static async Task<List<string>> UltimoPeriodoAsync(IQueryable<string?> periodos)
+        {
+            var distintos = await periodos
+                .Where(p => p != null)
+                .Distinct()
+                .ToListAsync();
+
+            if (distintos.Count == 0) return new List<string>();
+
+            var maximo = distintos
+                .Select(p => NormalizarPeriodo(p!))
+                .OrderByDescending(p => p, StringComparer.Ordinal)
+                .First();
+
+            return distintos
+                .Where(p => NormalizarPeriodo(p!) == maximo)
+                .Select(p => p!)
+                .ToList();
+        }
+
         public async Task<BuscadorEmpresaResponseDto> ObtenerTodasLasTablasPorRucAsync(string numeroDocumento)
         {
-            // 1. Validación de seguridad en la entrada
             if (string.IsNullOrWhiteSpace(numeroDocumento) ||
                 numeroDocumento.Length != 11 ||
                 !numeroDocumento.StartsWith("20"))
@@ -27,33 +51,65 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.empresas
                 throw new ArgumentException("El documento debe ser un RUC válido de 11 dígitos que empiece con 20.");
             }
 
-            // 2. Ejecutar las consultas secuencialmente con await para proteger el DbContext
-            var moviles = await _context.Movil
-                .Where(x => x.Documento == numeroDocumento && x.Documento.Length == 11 && x.Documento.StartsWith("20"))
-                .Take(10)
+            // Obtenemos el año actual de forma dinámica (por ejemplo, "2026")
+            string anioActual = DateTime.Now.Year.ToString();
+
+            // Filtramos para que solo tome en cuenta los periodos del año actual
+            var pMovil = await _context.Movil
+                .Where(x => x.Documento == numeroDocumento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .Select(x => x.Periodo)
                 .ToListAsync();
 
-            var sueldos = await _context.Sueldos
-                .Where(x => x.Documento == numeroDocumento && x.Documento.Length == 11 && x.Documento.StartsWith("20"))
-                .Take(10)
+            var moviles = pMovil.Count == 0 ? new List<Movil>() : await _context.Movil
+                .AsNoTracking()
+                .Where(x => x.Documento == numeroDocumento && pMovil.Contains(x.Periodo))
+                .Take(50)
                 .ToListAsync();
 
-            var deudas = await _context.Deudas
-                .Where(x => x.Documento == numeroDocumento && x.Documento.Length == 11 && x.Documento.StartsWith("20"))
-                .Take(10)
+            var pSueldo = await _context.Sueldos
+                .Where(x => x.Documento == numeroDocumento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .Select(x => x.Periodo)
                 .ToListAsync();
 
-            var lineas = await _context.LineaCreditos
-                .Where(x => x.Documento == numeroDocumento && x.Documento.Length == 11 && x.Documento.StartsWith("20"))
-                .Take(10)
+            var sueldos = pSueldo.Count == 0 ? new List<Sueldo>() : await _context.Sueldos
+                .AsNoTracking()
+                .Where(x => x.Documento == numeroDocumento && pSueldo.Contains(x.Periodo))
+                .Take(50)
                 .ToListAsync();
 
-            var calificaciones = await _context.Calificaciones
-                .Where(x => x.Documento == numeroDocumento && x.Documento.Length == 11 && x.Documento.StartsWith("20"))
-                .Take(10)
+            var pDeuda = await _context.Deudas
+                .Where(x => x.Documento == numeroDocumento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .Select(x => x.Periodo)
                 .ToListAsync();
 
-            // 3. Retornar el objeto consolidado con los resultados ya obtenidos
+            var deudas = pDeuda.Count == 0 ? new List<Deuda>() : await _context.Deudas
+                .AsNoTracking()
+                .Where(x => x.Documento == numeroDocumento && pDeuda.Contains(x.Periodo))
+                .Take(50)
+                .ToListAsync();
+
+            var pLinea = await _context.LineaCreditos
+                .Where(x => x.Documento == numeroDocumento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .Select(x => x.Periodo)
+                .ToListAsync();
+
+            var lineas = pLinea.Count == 0 ? new List<LineaCredito>() : await _context.LineaCreditos
+                .AsNoTracking()
+                .Where(x => x.Documento == numeroDocumento && pLinea.Contains(x.Periodo))
+                .Take(50)
+                .ToListAsync();
+
+            var pCalif = await _context.Calificaciones
+                .Where(x => x.Documento == numeroDocumento && x.Periodo != null && x.Periodo.StartsWith(anioActual))
+                .Select(x => x.Periodo)
+                .ToListAsync();
+
+            var calificaciones = pCalif.Count == 0 ? new List<Calificacion>() : await _context.Calificaciones
+                .AsNoTracking()
+                .Where(x => x.Documento == numeroDocumento && pCalif.Contains(x.Periodo))
+                .Take(50)
+                .ToListAsync();
+
             return new BuscadorEmpresaResponseDto
             {
                 Moviles = moviles,
@@ -78,16 +134,27 @@ namespace internal_search_backend.Infraestructure.Repositories.Buscador.empresas
 
             string filtro = razonSocial.Trim();
 
-            // Usamos StartsWith en lugar de Contains para que SQL use índices y no dé Timeout
+            // Obtenemos el año actual de forma dinámica (ej. "2026")
+            string anioActual = DateTime.Now.Year.ToString();
+
+            // Filtramos por razón social Y estrictamente por el año actual
             var deudas = await _context.Deudas
                 .AsNoTracking()
-                .Where(x => x.RazonSocial != null && x.RazonSocial.StartsWith(filtro))
+                .Where(x => x.RazonSocial != null &&
+                            x.RazonSocial.StartsWith(filtro) &&
+                            x.Periodo != null &&
+                            x.Periodo.StartsWith(anioActual)) // <--- FILTRO DEL AÑO ACTUAL
+                .OrderByDescending(x => x.Periodo) // Usualmente quieres ver los más recientes primero
                 .Take(50)
                 .ToListAsync();
 
             var lineas = await _context.LineaCreditos
                 .AsNoTracking()
-                .Where(x => x.RazonSocial != null && x.RazonSocial.StartsWith(filtro))
+                .Where(x => x.RazonSocial != null &&
+                            x.RazonSocial.StartsWith(filtro) &&
+                            x.Periodo != null &&
+                            x.Periodo.StartsWith(anioActual)) // <--- FILTRO DEL AÑO ACTUAL
+                .OrderByDescending(x => x.Periodo) // Usualmente quieres ver los más recientes primero
                 .Take(50)
                 .ToListAsync();
 

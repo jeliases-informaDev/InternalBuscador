@@ -45,6 +45,7 @@ using internal_search_backend.Health;
 using Microsoft.Extensions.Hosting.WindowsServices;
 
 
+
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
@@ -68,7 +69,7 @@ if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
         "Jwt:Key no configurada o demasiado corta (mínimo 32 caracteres). Ver appsettings.example.json.");
 
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]
-                ?? throw new InvalidOperationException(
+              ?? throw new InvalidOperationException(
                     "No se configuró Jwt:Issuer");
 
 var jwtAudience = builder.Configuration["Jwt:Audience"]
@@ -94,8 +95,6 @@ builder.Services
             ClockSkew = TimeSpan.Zero
         };
 
-        // Estado y roles se verifican en base de datos en cada petición: un usuario desactivado
-        // o con el rol retirado pierde acceso al instante, sin esperar a que venza el token.
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = async context =>
@@ -119,8 +118,6 @@ builder.Services
                     return;
                 }
 
-                // Sesión revocada (cambio de clave o cierre forzado): vale solo lo emitido después.
-                // Un token sin iat es anterior a este control, así que también se rechaza.
                 if (sesion.RevocadoDesdeUtc is { } revocado)
                 {
                     var revocadoSeg = new DateTimeOffset(DateTime.SpecifyKind(revocado, DateTimeKind.Utc))
@@ -155,12 +152,10 @@ builder.Services.AddScoped<IContrasenaRepository, ContrasenaService>();
 builder.Services.AddScoped<IJwtRepository, JwtRepository>();
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 
-// Alta de usuarios y recuperación de contraseña
 builder.Services.AddScoped<IPasswordResetRepository, PasswordResetRepository>();
 builder.Services.AddScoped<IRecuperacionClaveService, RecuperacionClaveService>();
 builder.Services.AddScoped<IUsuarioAdminService, UsuarioAdminService>();
 
-// Tokens de consulta y auditoría
 builder.Services.AddScoped<ITokenRepository, TokenRepository>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuditoriaRepository, AuditoriaRepository>();
@@ -188,13 +183,10 @@ builder.Services.AddScoped<IMenuRepository, MenuRepository>();
 
 builder.Services.AddScoped<IBuscadorRepository, IndividualRepository>();
 
-// Búsqueda individual por persona (DNI / teléfono). Ya existe otro IIndividualService, el de empresas,
-// registrado más abajo: por eso los nombres van completos. Faltaba este registro y /api/buscador/buscar daba 500.
 builder.Services.AddScoped<
     internal_search_backend.Business.Services.Buscador.personas.individual.IIndividualService,
     internal_search_backend.Business.Services.Buscador.personas.individual.IndividualService>();
 
-// RENIEC (proveedor externo, solo consulta individual)
 builder.Services.AddSingleton(
     builder.Configuration.GetSection("Reniec").Get<ReniecOptions>() ?? new ReniecOptions());
 builder.Services.AddHttpClient<IReniecClient, ReniecClient>(c => c.Timeout = TimeSpan.FromSeconds(20));
@@ -203,27 +195,32 @@ builder.Services.AddScoped<IReniecService, ReniecService>();
 builder.Services.AddScoped<IBuscadorMasivoRepository, BuscadorMasivoRepository>();
 builder.Services.AddScoped<IMasivoExcelService, BuscadorMasivoService>();
 
-builder.Services.AddScoped<IBuscadorMasivoExcelService,BuscadorMasivoExcelService>();
+builder.Services.AddScoped<IBuscadorMasivoExcelService, BuscadorMasivoExcelService>();
 
 builder.Services.AddScoped<IHistorialRepository, HistorialRepository>();
 builder.Services.AddScoped<IHistorialService, HistorialService>();
 
-// Registro de repositorios y servicios de empresa (individual y masivo)
 builder.Services.AddScoped<IEmpresaIndividualRepository, BuscadorIndividualRepository>();
-builder.Services.AddScoped<internal_search_backend.Business.Services.Buscador.empresa.individual.IIndividualService, internal_search_backend.Business.Services.Buscador.empresa.individual.IndividualService>();
+
+builder.Services.AddScoped<
+    internal_search_backend.Business.Services.Buscador.empresa.individual.IIndividualService,
+    internal_search_backend.Business.Services.Buscador.empresa.individual.IndividualService>();
+
+builder.Services.AddScoped<
+    internal_search_backend.Business.Services.Buscador.personas.individual.IIndividualService,
+    internal_search_backend.Business.Services.Buscador.personas.individual.IndividualService>();
 
 builder.Services.AddScoped<IBuscadorEmpresaMasivoRepository, BuscadorEmpresaMasivoRepository>();
 builder.Services.AddScoped<IBuscadorEmpresaMasivoService, BuscadorEmpresaMasivoService>();
 
-// Authorization
+builder.Services.AddScoped<IBuscadorEmpresaMasivoExcelService, BuscadorEmpresaMasivoExcelService>();
+
 builder.Services.AddAuthorization(options =>
 {
-    // Administración de cuentas, tokens y auditoría
     options.AddPolicy("AdminGeneral", policy =>
         policy.RequireAssertion(ctx => ctx.User.EsAdminGeneral()));
 });
 
-// Límite de intentos por IP en login y recuperación (frena fuerza bruta y abuso del envío de correos)
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -237,9 +234,6 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
-// Controllers
-// AddControllersAsServices hace que, en Desarrollo, el validador de dependencias revise al arrancar
-// que cada controlador tenga todo registrado (así un servicio faltante falla al iniciar, no en una consulta)
 builder.Services.AddControllers(options =>
     options.Filters.Add<ManejadorExcepcionesFilter>())
     .AddControllersAsServices();
@@ -249,7 +243,6 @@ builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<BaseDatosHealthCheck>();
 builder.Services.AddHealthChecks().AddCheck<BaseDatosHealthCheck>("base_datos");
 
-// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -275,12 +268,18 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Configuración robusta de CORS incluyendo el dominio de producción en Render
+var corsOriginsConfig = builder.Configuration.GetSection("Cors:Origins").Get<string[]>();
+var defaultOrigins = new[]
+{
+    "http://localhost:4200",
+    "https://localhost:4200",
+    "https://internal-search-frontend-1.onrender.com"
+};
 
-// Orígenes del frontend: Cors:Origins en appsettings o variables Cors__Origins__0, Cors__Origins__1...
-var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
-    is { Length: > 0 } configurados
-        ? configurados
-        : new[] { "http://localhost:4200", "https://localhost:4200" };
+var corsOrigins = corsOriginsConfig is { Length: > 0 }
+    ? corsOriginsConfig.Union(defaultOrigins).ToArray()
+    : defaultOrigins;
 
 builder.Services.AddCors(options =>
 {
@@ -297,7 +296,6 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -305,25 +303,19 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    // Errores no controlados: 500 genérico, sin trazas ni mensajes internos
     app.UseExceptionHandler();
     app.UseHsts();
 }
 
-// Detrás de IIS/nginx/proxy en la misma máquina: usa la IP real del cliente (límite de intentos y auditoría)
 var cabecerasReenviadas = new ForwardedHeadersOptions
 {
     ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
                      | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
 };
 
-// Si la API corre en un contenedor o detrás de un túnel (Cloudflare Tunnel, etc.) el proxy NO es "localhost":
-// sin esto todos los usuarios compartirían la IP del proxy y el límite de 10 intentos/minuto los bloquearía a
-// todos a la vez. Activar SOLO si el puerto de la API no es accesible directamente desde internet
-// (Proxy:ConfiarEnCabeceras=true, o la variable Proxy__ConfiarEnCabeceras).
 if (app.Configuration.GetValue<bool>("Proxy:ConfiarEnCabeceras"))
 {
-#pragma warning disable ASPDEPR005 // KnownNetworks: se vacía para aceptar el proxy de la plataforma
+#pragma warning disable ASPDEPR005
     cabecerasReenviadas.KnownNetworks.Clear();
 #pragma warning restore ASPDEPR005
     cabecerasReenviadas.KnownProxies.Clear();
@@ -332,16 +324,12 @@ if (app.Configuration.GetValue<bool>("Proxy:ConfiarEnCabeceras"))
 
 app.UseForwardedHeaders(cabecerasReenviadas);
 
-app.UseHttpsRedirection();
-
 app.UseCors("Frontend");
 
 app.UseRateLimiter();
 
-// JWT
 app.UseAuthentication();
 
-// Authorization
 app.UseAuthorization();
 
 app.MapControllers();
